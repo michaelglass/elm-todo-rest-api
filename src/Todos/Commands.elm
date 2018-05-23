@@ -1,12 +1,12 @@
 module Todos.Commands exposing (..)
 
 import Http
-import Task
 import Json.Decode
 import Json.Encode
 import String
-import Todos.Models exposing (Todo)
+import Task
 import Todos.Messages exposing (Msg(..))
+import Todos.Models exposing (Flags, Todo)
 import Utils
 
 
@@ -25,7 +25,7 @@ resourceUrl =
 
 singleUrl : Int -> String
 singleUrl id =
-    String.join "/" [ resourceUrl, (toString id) ]
+    String.join "/" [ resourceUrl, toString id ]
 
 
 
@@ -39,19 +39,19 @@ singleUrl id =
 -- json decoder for todos list
 
 
-todosDecoder : Json.Decode.Decoder (List Todo)
-todosDecoder =
+flagsListDecoder : Json.Decode.Decoder (List Flags)
+flagsListDecoder =
     -- notice how decoders are composable
-    Json.Decode.list todoDecoder
+    Json.Decode.list flagsDecoder
 
 
 
 -- json decoder for single todo
 
 
-todoDecoder : Json.Decode.Decoder Todo
-todoDecoder =
-    Json.Decode.map3 Todo
+flagsDecoder : Json.Decode.Decoder Flags
+flagsDecoder =
+    Json.Decode.map3 Flags
         (Json.Decode.field "id" Json.Decode.int)
         (Json.Decode.field "title" Json.Decode.string)
         (Json.Decode.field "completed" Json.Decode.bool)
@@ -71,8 +71,8 @@ todoEncoder title completed =
             , ( "completed", Json.Encode.bool completed )
             ]
     in
-        encodings
-            |> Json.Encode.object
+    encodings
+        |> Json.Encode.object
 
 
 
@@ -85,9 +85,10 @@ todoEncoder title completed =
 fetchAll : Cmd Msg
 fetchAll =
     let
-        request = Http.get resourceUrl todosDecoder
+        request =
+            Http.get resourceUrl flagsListDecoder
     in
-        Http.send FetchAllDone request
+    Http.send FetchAllDone request
 
 
 
@@ -97,13 +98,14 @@ fetchAll =
 -- create todo
 
 
-create : String -> Cmd Msg
-create title =
-    let 
-      task = Utils.postJson todoDecoder resourceUrl  
-        <| todoEncoder title False
+create : Int -> String -> Cmd Msg
+create priority title =
+    let
+        task =
+            Utils.postJson flagsDecoder resourceUrl <|
+                todoEncoder title False
     in
-      Task.attempt CreateDone task
+    Task.attempt (CreateDone priority) task
 
 
 
@@ -113,13 +115,19 @@ create title =
 -- patch todo
 
 
+todoToFlags : Todo -> Flags
+todoToFlags { id, title, completed } =
+    { id = id, title = title, completed = completed }
+
+
 patch : Todo -> Cmd Msg
-patch { id, title, completed } =
+patch { id, title, completed, priority } =
     let
-      task = Utils.patchJson todoDecoder (singleUrl id)
-        <| todoEncoder title completed
+        task =
+            Utils.patchJson flagsDecoder (singleUrl id) <|
+                todoEncoder title completed
     in
-      Task.attempt PatchDone task
+    Task.attempt (PatchDone priority) task
 
 
 
@@ -130,4 +138,4 @@ patch { id, title, completed } =
 
 delete : Todo -> Cmd Msg
 delete todo =
-    Task.attempt DeleteDone <| Utils.delete todo (singleUrl todo.id)
+    Task.attempt DeleteDone (Utils.delete todo (singleUrl todo.id))

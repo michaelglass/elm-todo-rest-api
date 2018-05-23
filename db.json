@@ -4,6 +4,16 @@
       "completed": false,
       "id": 1,
       "title": "buy milk"
+    },
+    {
+      "title": "better title",
+      "completed": false,
+      "id": 2
+    },
+    {
+      "title": "another",
+      "completed": false,
+      "id": 3
     }
   ]
 }

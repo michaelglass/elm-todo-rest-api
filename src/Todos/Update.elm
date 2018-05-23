@@ -2,13 +2,15 @@ module Todos.Update exposing (..)
 
 -- we want Msg along with all of its subtypes automatically (..)
 
-import Todos.Messages exposing (Msg(..))
-import Todos.Models exposing (TodoEditView(..), Todo)
 import Todos.Commands
+import Todos.Messages exposing (Msg(..))
+import Todos.Models exposing (Flags, Todo, TodoEditView(..))
 import Utils
 
 
--- handle messages relevant to model.todos
+flagsToTodo : Int -> Flags -> Todo
+flagsToTodo priority { id, completed, title } =
+    { id = id, completed = completed, title = title, priority = priority }
 
 
 update : Msg -> TodoEditView -> List Todo -> ( TodoEditView, List Todo, Cmd Msg )
@@ -34,13 +36,36 @@ update msg ev todos =
                         None ->
                             ev
 
-                        New _ ->
-                            New title
+                        New _ priority ->
+                            New title priority
 
                         Editing todo ->
                             Editing { todo | title = title }
             in
-                ( nev, todos, Cmd.none )
+            ( nev, todos, Cmd.none )
+
+        ChangePriority priorityResult ->
+            let
+                priorityWithDefault default =
+                    case String.toInt priorityResult of
+                        Ok val ->
+                            val
+
+                        Err _ ->
+                            default
+
+                nev =
+                    case ev of
+                        None ->
+                            ev
+
+                        New title oldPriority ->
+                            New title (priorityWithDefault oldPriority)
+
+                        Editing todo ->
+                            Editing { todo | priority = priorityWithDefault todo.priority }
+            in
+            ( nev, todos, Cmd.none )
 
         -- this is matched when there is an http error
         -- it gives us an Http.Error, but we don't need it,
@@ -49,27 +74,52 @@ update msg ev todos =
             -- disregard error; do nothing
             ( ev, todos, Cmd.none )
 
+        ChangePriorityInline changedTodo priorityString ->
+            let
+                newPriority =
+                    case String.toInt priorityString of
+                        Ok priority ->
+                            priority
+
+                        Err _ ->
+                            changedTodo.priority
+            in
+            ( ev
+            , List.map
+                (\todo ->
+                    if todo.id == changedTodo.id then
+                        { todo | priority = newPriority }
+                    else
+                        todo
+                )
+                todos
+            , Cmd.none
+            )
+
         -- fetch all success
         FetchAllDone res ->
             case res of
-                Result.Ok newTodos ->
-                    ( ev, newTodos, Cmd.none )
+                Result.Ok newFlags ->
+                    ( ev, List.map (flagsToTodo 0) newFlags, Cmd.none )
+
                 Result.Err _ ->
                     ( ev, todos, Cmd.none )
 
         -- create success...merge in the new todo
-        CreateDone res ->
+        CreateDone priority res ->
             case res of
-                Result.Ok todo ->
-                    ( ev, Utils.mergeById todos todo, Cmd.none )
+                Result.Ok flags ->
+                    ( ev, Utils.mergeById todos (flagsToTodo priority flags), Cmd.none )
+
                 Result.Err _ ->
                     ( ev, todos, Cmd.none )
 
         -- patch success...merge in the new todo
-        PatchDone res ->
+        PatchDone priority res ->
             case res of
-                Result.Ok newTodo ->
-                    ( ev, Utils.mergeById todos newTodo, Cmd.none )
+                Result.Ok newFlags ->
+                    ( ev, Utils.mergeById todos (flagsToTodo priority newFlags), Cmd.none )
+
                 Result.Err _ ->
                     ( ev, todos, Cmd.none )
 
@@ -78,6 +128,7 @@ update msg ev todos =
             case res of
                 Result.Ok todo ->
                     ( ev, Utils.removeById todos todo, Cmd.none )
+
                 Result.Err _ ->
                     ( ev, todos, Cmd.none )
 
@@ -90,8 +141,8 @@ update msg ev todos =
                             Cmd.none
 
                         -- create a new todo
-                        New title ->
-                            Todos.Commands.create title
+                        New title priority ->
+                            Todos.Commands.create priority title
 
                         -- patch an existing todo
                         Editing todo ->
@@ -100,7 +151,7 @@ update msg ev todos =
                 -- exit edit view (using None) and give elm our command
                 -- see note below in Complete
             in
-                ( None, todos, cmd )
+            ( None, todos, cmd )
 
         -- this is matched when "Done is clicked"
         Complete todo ->
@@ -119,7 +170,7 @@ update msg ev todos =
                 newTodos =
                     todos
             in
-                ( ev, newTodos, Todos.Commands.patch newTodo )
+            ( ev, newTodos, Todos.Commands.patch newTodo )
 
         -- this is matched when "Revert" is clicked
         Revert todo ->
@@ -130,7 +181,7 @@ update msg ev todos =
 
                 -- see note above in Complete
             in
-                ( ev, todos, Todos.Commands.patch newTodo )
+            ( ev, todos, Todos.Commands.patch newTodo )
 
         -- this is a generic Patch for a todo that has already been altered
         Patch todo ->
@@ -157,4 +208,4 @@ update msg ev todos =
                         -- attach a delete command to each
                         |> List.map Todos.Commands.delete
             in
-                ( ev, todos, Cmd.batch cmds )
+            ( ev, todos, Cmd.batch cmds )

@@ -9,6 +9,14 @@ type alias Todo =
     { id : Int
     , title : String
     , completed : Bool
+    , priority : Int
+    }
+
+
+type alias Flags =
+    { id : Int
+    , title : String
+    , completed : Bool
     }
 
 
@@ -21,6 +29,6 @@ type TodoEditView
     = -- if None, then just show the "Create New Todo" button
       None
       -- the String here represents the value currently in the text box
-    | New String
+    | New String Int
       -- similar, but here it's the Todo.title that holds the text box value
     | Editing Todo

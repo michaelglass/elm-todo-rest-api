@@ -3,7 +3,7 @@ module Todos.Edit exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
-import Todos.Messages exposing (Msg(ShowEditView, ChangeTitle, CreateOrPatch))
+import Todos.Messages exposing (Msg(ChangePriority, ChangeTitle, CreateOrPatch, ShowEditView))
 import Todos.Models exposing (Todo, TodoEditView(..))
 
 
@@ -23,19 +23,19 @@ view ev =
                     -- so we can initialize it with an empty string
                     -- notice how the <| operator is needed here
                     -- to tell elm which arguments belong to what
-                    [ onClick <| ShowEditView <| New "" ]
+                    [ onClick <| ShowEditView <| New "" 0 ]
                     [ text "Create New Todo" ]
 
-            New title ->
+            New title priority ->
                 div []
                     [ h2 [] [ text "New Todo" ]
-                    , editingInputs title
+                    , editingInputs title priority
                     ]
 
-            Editing { title } ->
+            Editing { title, priority } ->
                 div []
                     [ h2 [] [ text <| "Editing Todo: " ++ title ]
-                    , editingInputs title
+                    , editingInputs title priority
                     ]
         ]
 
@@ -45,8 +45,8 @@ view ev =
 -- so they can be extracted into a separate component (editingInputs)
 
 
-editingInputs : String -> Html Msg
-editingInputs title =
+editingInputs : String -> Int -> Html Msg
+editingInputs title priority =
     div []
         [ button
             [ onClick <| ShowEditView None ]
@@ -55,6 +55,12 @@ editingInputs title =
             [ value title
             , placeholder "Title"
             , onInput ChangeTitle
+            ]
+            []
+        , input
+            [ value (toString priority)
+            , placeholder "Priority"
+            , onInput ChangePriority
             ]
             []
         , button
